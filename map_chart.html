@@ -2,30 +2,7 @@
   <head>
     <script type="text/javascript" src="https://www.google.com/jsapi"></script>
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
-    <script type="text/javascript">
-      google.load("visualization", "1", {packages:["geomap"]});
-      google.setOnLoadCallback(drawMap);
-      function drawMap() {
-        var data = google.visualization.arrayToDataTable([
-          ['Country', 'Presence'],
-          ['Germany', 200],
-          ['United States', 300],
-          ['Brazil', 400],
-          ['Canada', 500],
-          ['France', 600],
-          ['RU', 700]
-        ]);
-
-        var options = {};
-        options['dataMode'] = 'regions';
-        options['region'] = '005';
-
-        var container = document.getElementById('regions_div');
-        var geomap = new google.visualization.GeoMap(container);
-
-        geomap.draw(data, options);
-      };
-
+    <script type="text/javascript">    
       function getOpenings(){
         $.ajax({
             url: 'http://www.peacecorps.gov/api/v1/openings/',
@@ -76,24 +53,171 @@
             type: 'GET',
             success: function(data){
               for (var i = 0; i < data.length; i++){
-                map[data[i]['region']].push(data[i]['slug']);
+                map[data[i]['region']].push(data[i]);
+                // map[data[i]['region']].push(data[i]['slug']);
               }
               callback(map);
             }
           });
         });
-        
+      }
+
+      function getAllOpenings(callback){
+        $.ajax({
+          url: 'http://www.peacecorps.gov/api/v1/openings/',
+          type: 'GET',
+          success: function(data){
+            callback(data['results']);
+          }
+        })
       }
 
 
-      getCountriesByRegion(function(countries){
-        console.log(countries);
+      // getCountriesByRegion(function(countries){
+      //   console.log(countries);
         
-      });
+      // });
+
+      function showMap(){
+        google.load("visualization", "1", {packages:["geomap"]});
+        google.setOnLoadCallback(drawMap);
+        function drawMap() {
+          getCountriesByRegion(function(countries_by_region){
+            // generate list of countries (slugs)
+            var countries = [];
+            // console.log(countries_by_region);
+            var info_map = new Object(); // maps slugs to country info object
+            var name_to_slug = new Object(); // maps country name to slug
+            for (var region in countries_by_region){
+              var countries_in_region = countries_by_region[region];
+              for (var i = 0; i < countries_in_region.length; i++){
+                countries.push(countries_in_region[i]['slug']);
+                info_map[countries_in_region[i]['slug']] = countries_in_region[i];
+                name_to_slug[countries_in_region[i]['name']] = countries_in_region[i]['slug'];
+              }
+            }
+            // console.log(countries)
+            // console.log(name_to_slug);
+            // creat hashmap to map slug to number of openings
+            var openings_by_country = new Object();
+            var sector_map = new Object(); // sector_map[slug][sector] = boolean
+            // inialize hashmap with each country
+            for (var i = 0; i < countries.length; i++){
+              openings_by_country[countries[i]] = 0;
+              sector_map[countries[i]] = new Object();
+              sector_map[countries[i]]['Community Economic Development'] = false;
+              sector_map[countries[i]]['Health'] = false;
+              sector_map[countries[i]]['Environment'] = false;
+              sector_map[countries[i]]['Education'] = false;
+              sector_map[countries[i]]['Youth in Development'] = false;
+              sector_map[countries[i]]['Agriculture'] = false;
+            }
+            // console.log(openings_by_country);
+            getAllOpenings(function(openings){
+              // update hashmap
+              for (var j = 0; j < openings.length; j++){
+                openings_by_country[openings[j]['country']] ++;
+                sector_map[openings[j]['country']][openings[j]['sector']] = true;
+              }
+              // create data for geomap
+              var dataArray = [['Country', 'Openings']];
+              for (var i = 0; i < countries.length; i++){
+                numOpenings = openings_by_country[countries[i]];
+
+                if (numOpenings > 0) {
+                  // display name of country and num of openings
+                  dataArray.push([info_map[countries[i]]['name'], numOpenings]);
+                }
+              }
+              data = google.visualization.arrayToDataTable(dataArray);
+              // for (var k = 0; k < dataArray.length - 1; k ++){
+              //   console.log(dataArray[k + 1][0]);
+              //   data.setValue(0, k, dataArray[k + 1][0]);
+              // }
+              
+
+              var options = {};
+              options['dataMode'] = 'regions';
+              options['showZoomOut'] = false;
+              options['width'] = 834;
+              options['height'] = 521;
+              options['region'] = 'world';
+
+              var container = document.getElementById('regions_div');
+              var geomap = new google.visualization.GeoMap(container);
+              geomap.draw(data, options);
+              google.visualization.events.addListener(geomap, 'regionClick', function(e) {
+                var region = e['region'];
+                console.log(region);
+                // options['region'] = region;
+                // geomap.draw(data, options);
+
+
+
+              });
+
+              // zoomOut event listener -> sets back to world view
+              google.visualization.events.addListener(geomap, 'zoomOut', function(e) {
+                options['region'] = 'world';
+                geomap.draw(data, options);
+              });
+
+              // select event listene
+              google.visualization.events.addListener(geomap, 'select', function(e) {
+                var row = geomap.getSelection()[0]['row'];
+                var name = dataArray[row+1][0];
+                var slug = name_to_slug[name];
+                var url = info_map[slug]['country_page_url'];
+                console.log('here');  
+                var num_openings = openings_by_country[slug];
+                console.log(num_openings);  
+                // console.log(slug);
+                console.log(url);
+                console.log(info_map[slug]);
+                $("#country_name").html(name);
+                $("#country_url").attr("href", url);
+                $('#country_openings').html('Openings: ' + num_openings);
+                $('#areas_label').css('visibility', 'visible');
+                // clear previous areas list
+                $("#areas_list").empty();
+                // update areas list
+                for (sector in sector_map[slug]){
+                  if (sector_map[slug][sector]){
+                    $("#areas_list").append('<li>'+sector+'</li>');
+                  }
+                }
+
+
+              });
+            });
+          });
+            
+          
+        };
+
+      }
+
+      showMap();
+      // $(document).ready(function(){
+      //   console.log(0);
+      //   document.getElementById("regions_div").addEventListener('regionClick', function(region){
+      //     console.log(1);
+      //     console.log(region);
+      //   });
+      // })
+
 
     </script>
   </head>
   <body>
-    <div id="regions_div" style="width: 900px; height: 500px;"></div>
+    <div>
+      <div style= "float: left" id="regions_div" style="width: 900px; height: 500px;"></div>
+      <div style= "float: left" id="country_info">
+        <a id = "country_url" href=""><h1 id="country_name"></h1></a>
+        <h2 id= "country_openings"></h2>
+        <h2 style="visibility: hidden" id="areas_label">Available Areas:</h2>
+        <ul id= "areas_list"></ul>
+      </div>
+    </div>
   </body>
 </html>
