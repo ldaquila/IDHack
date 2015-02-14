@@ -19,43 +19,47 @@
     google.setOnLoadCallback(drawMap);
     google.setOnLoadCallback(drawTable);
 
+    regions_map = new Object();
+    countries_map = new Object();
+
     function drawMap() {
-      var data = google.visualization.arrayToDataTable([
-        ['Country', 'Opportunities'],
-        ['China', 'China: \nagriculture: 0 \ncommunity economic development: 1 \neducation: 2 \nenvironment: 0 \nhealth: 4 \nyouth in development: 9'],
-        ['India', 'India: \nagriculture: 0 \ncommunity economic development: 1 \neducation: 2 \nenvironment: 0 \nhealth: 4 \nyouth in development: 9'],
-      ]);
+		var data = google.visualization.arrayToDataTable([
+		['Country', 'Opportunities'],
+		['China', 'China: \nagriculture: 0 \ncommunity economic development: 1 \neducation: 2 \nenvironment: 0 \nhealth: 4 \nyouth in development: 9'],
+		['India', 'India: \nagriculture: 0 \ncommunity economic development: 1 \neducation: 2 \nenvironment: 0 \nhealth: 4 \nyouth in development: 9'],
+		]);
 
-    var options = { showTip: true };
+		var options = { showTip: true };
 
-    var map = new google.visualization.Map(document.getElementById('chart_div'));
+		var map = new google.visualization.Map(document.getElementById('chart_div'));
 
-    map.draw(data, options);
+		map.draw(data, options);
 
 	}
 
-  function drawTable(results) {
-    var data = new google.visualization.DataTable();
-	data.addColumn('string', 'Sector'); 
-	data.addColumn('string', 'Title');
-    data.addColumn('string', 'Country');
-    data.addColumn('string', 'Region');
-    data.addColumn('string', 'Start Date');
-    rowsList = [];
-    for (var i=0; i<results.length; i++) {
-    	rowsList.push([results[i]['sector'], "<a href='" + results[i]['opening_url'] + "'>" + results[i]['title'] + "</a>", capitalizeFirstLetter(results[i]['country']), capitalizeFirstLetter(results[i]['region']), results[i]['staging_start_date']]);
-    }
-    data.setColumnProperty(0, {allowHtml: true});
-    data.addRows(rowsList);
+	function drawTable(results) {
+		var data = new google.visualization.DataTable();
+		data.addColumn('string', 'Sector'); 
+		data.addColumn('string', 'Title');
+		data.addColumn('string', 'Country');
+		data.addColumn('string', 'Region');
+		data.addColumn('string', 'Start Date');
+		rowsList = [];
+		for (var i=0; i<results.length; i++) {
+			rowsList.push([results[i]['sector'], "<a href='" + results[i]['opening_url'] + "'>" + results[i]['title'] + "</a>", countries_map[results[i]['country']], regions_map[results[i]['region']], results[i]['staging_start_date']]);
+		}
+		data.setColumnProperty(0, {allowHtml: true});
+		data.addRows(rowsList);
 
-    var table = new google.visualization.Table(document.getElementById('results_table'));
+		var table = new google.visualization.Table(document.getElementById('results_table'));
 
-    table.draw(data, {allowHtml: true});
-    function capitalizeFirstLetter(string)
-    {
-        return string.charAt(0).toUpperCase() + string.slice(1);
-    }
-  };
+		table.draw(data, {allowHtml: true});
+	};
+
+	function capitalizeFirstLetter(string)
+	{
+	    return string.charAt(0).toUpperCase() + string.slice(1);
+	}
 
     // TODO: Change regions
     regions = ["africa","asia","centralamerica","easteurope","northafr","pacificislands","southamerica","caribbean"];
@@ -141,16 +145,15 @@
 			next = openings['next'];
 
 			if (openings['previous']) {
-				$("#previous").show();
+				$("#previous").css('visibility', 'visible');
 			} else {
-				$("#previous").hide();
+				$("#previous").css('visibility', 'hidden');
 			}
 			if (openings['next']) {
-				$("#next").show();
+				$("#next").css('visibility', 'visible');
 			} else {
-				$("#next").hide();
+				$("#next").css('visibility', 'hidden');
 			}
-			console.log(openings);
 	    };
 
 	    getOpenings(getOpeningsInner, query);
@@ -166,13 +169,74 @@
 		});
 	};
 
-  $(document).on('click', '#previous', function(ev) {
-  	getOpenings(getOpeningsInner, previous);
-  });
+	/*  callback: callback function
+	    passes a list of regions to callback
+	    ex: [africa, easteurope]
+	*/
+	function getRegions(callback){
+	  $.ajax({
+	    url: 'http://www.peacecorps.gov/api/v1/geography/regions/',
+	    type: 'GET',
+	    success: function(data){
+	      regions_map = new Object();
+	      var regions = [];
 
-  $(document).on('click', '#next', function(ev) {
-  	getOpenings(getOpeningsInner, next);
-  });
+	      for (var i = 0; i < data.length; i++){
+	        regions.push(data[i]['slug']);
+	        regions_map[data[i]['slug']] = data[i]['name'];
+	      }
+	      callback(regions);
+	    }
+	  });
+	}
+
+	/*
+	  callback: callback function
+	  passes an object that maps regions to corresponding countries to callback function
+
+	  ex: {africa: [congo, nigeria], asia: [thailand, laos]}
+
+	*/
+	function getCountriesByRegion(callback){
+	  getRegions(function(regions){
+	    // initialize hashmap
+	    var map = new Object();
+	    for (var i = 0; i < regions.length; i++){
+	      map[regions[i]] = []
+	    }
+	    // get countries
+	    $.ajax({
+	      url: 'http://www.peacecorps.gov/api/v1/geography/countries/?current=true',
+	      type: 'GET',
+	      success: function(data){
+	        for (var i = 0; i < data.length; i++){
+	          map[data[i]['region']].push(data[i]);
+	          countries_map[data[i]['slug']] = data[i]['name'];
+	        }
+	        callback(map);
+	      }
+	    });
+	  }); 
+	}
+
+	getCountriesByRegion(function(regions){
+		$("#countries").find('option').remove().end();
+		for (region in regions) {
+			$("#countries").append($("<option />").val(region).html(regions_map[region]));
+			for (country in regions[region]) {
+				var country = regions[region][country];
+				$("#countries").append($("<option />").val(country['slug']).html("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + country['name']));
+			}
+		}
+	});
+
+	$(document).on('click', '#previous', function(ev) {
+		getOpenings(getOpeningsInner, previous);
+	});
+
+	$(document).on('click', '#next', function(ev) {
+		getOpenings(getOpeningsInner, next);
+	});
 
   </script>
   </head>
@@ -181,10 +245,6 @@
   	<section>
   	Where do you want to go? <br>
   	<select id="countries" multiple>
-  	<option value="caribbean">The Caribbean</option>
-  	<option value="dominicanrepublic">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dominican Republic</option>
-  	<option value="easterncarribean">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Eastern Carribean</option>
-  	<option value="jamaica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Jamaica</option>
   	</select>
   	</section>
   	<section>
@@ -274,7 +334,7 @@
     <div id="results_div">
     	<label id="count"></label> opening(s). Click on a column header to sort.
     	<div id="results_table"></div>
-    	<button id="previous">Previous Page</button><button id="next">Next Page</button>
+    	<button id="previous" style="visibility:hidden">Previous Page</button><button id="next" style="visibility:hidden">Next Page</button>
    	</div>
   </body>
 </html>
