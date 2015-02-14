@@ -14,6 +14,7 @@
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
   <script>
+  	var previous=""; var next="";
     google.load('visualization', '1', { 'packages': ['map', 'table'] });
     google.setOnLoadCallback(drawMap);
     google.setOnLoadCallback(drawTable);
@@ -31,50 +32,34 @@
 
     map.draw(data, options);
 
-    google.visualization.events.addListener(map, 'select', selectHandler);
+	}
 
-    function selectHandler() {
-	  var selection = map.getSelection();
-	  var message = '';
-	  for (var i = 0; i < selection.length; i++) {
-	    var item = selection[i];
-	    if (item.row != null && item.column != null) {
-	      var str = data.getFormattedValue(item.row, item.column);
-	      message += '{row:' + item.row + ',column:' + item.column + '} = ' + str + '\n';
-	    } else if (item.row != null) {
-	      var str = data.getFormattedValue(item.row, 0);
-	      message += '{row:' + item.row + ', column:none}; value (col 0) = ' + str + '\n';
-	    } else if (item.column != null) {
-	      var str = data.getFormattedValue(0, item.column);
-	      message += '{row:none, column:' + item.column + '}; value (row 0) = ' + str + '\n';
-	    }
-	  }
-	  if (message == '') {
-	    message = 'nothing';
-	  }
-	  alert('You selected ' + message);
-    };
-  };
-
-  function drawTable() {
+  function drawTable(results) {
     var data = new google.visualization.DataTable();
 	data.addColumn('string', 'Sector'); 
-	data.addColumn('string', 'Position');
+	data.addColumn('string', 'Title');
     data.addColumn('string', 'Country');
     data.addColumn('string', 'Region');
-    data.addColumn('string', 'Departs By');
-    data.addRows([
-      ['Education', 'Secondary Education English Teacher',  "Indonesia", "Asia", "March 2016"],
-      ['Education', 'Primary Education English Teacher',  "China", "Asia", "March 2015"]
-    ]);
+    data.addColumn('string', 'Start Date');
+    rowsList = [];
+    for (var i=0; i<results.length; i++) {
+    	rowsList.push([results[i]['sector'], "<a href='" + results[i]['opening_url'] + "'>" + results[i]['title'] + "</a>", capitalizeFirstLetter(results[i]['country']), capitalizeFirstLetter(results[i]['region']), results[i]['staging_start_date']]);
+    }
+    data.setColumnProperty(0, {allowHtml: true});
+    data.addRows(rowsList);
 
     var table = new google.visualization.Table(document.getElementById('results_table'));
 
-    table.draw(data, {showRowNumber: true});
+    table.draw(data, {allowHtml: true});
+    function capitalizeFirstLetter(string)
+    {
+        return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+  };
 
     // TODO: Change regions
     regions = ["africa","asia","centralamerica","easteurope","northafr","pacificislands","southamerica","caribbean"];
-    $('#searchForm').submit(function(ev) {
+    $(document).on('submit', '#searchForm', function(ev) {
     	ev.preventDefault();
     	var query = "http://www.peacecorps.gov/api/v1/openings/";
 
@@ -148,8 +133,47 @@
 	    }
 
     	console.log(query);
-	});
-  }
+
+	    getOpeningsInner = function(openings) {
+			drawTable(openings['results']);
+			$("#count").html(openings['count']);
+			previous = openings['previous'];
+			next = openings['next'];
+
+			if (openings['previous']) {
+				$("#previous").show();
+			} else {
+				$("#previous").hide();
+			}
+			if (openings['next']) {
+				$("#next").show();
+			} else {
+				$("#next").hide();
+			}
+			console.log(openings);
+	    };
+
+	    getOpenings(getOpeningsInner, query);
+	 });
+
+	function getOpenings(callback, url){
+		$.ajax({
+		    url: url,
+		    type: 'GET',
+		    success: function(data) { 
+		      callback(data);
+		    }
+		});
+	};
+
+  $(document).on('click', '#previous', function(ev) {
+  	getOpenings(getOpeningsInner, previous);
+  });
+
+  $(document).on('click', '#next', function(ev) {
+  	getOpenings(getOpeningsInner, next);
+  });
+
   </script>
   </head>
   <body>
@@ -248,8 +272,9 @@
     <div id="chart_div"></div>
 
     <div id="results_div">
-    	<label>1</label> opening. Click on a column header to sort.
+    	<label id="count"></label> opening(s). Click on a column header to sort.
     	<div id="results_table"></div>
+    	<button id="previous">Previous Page</button><button id="next">Next Page</button>
    	</div>
   </body>
 </html>
