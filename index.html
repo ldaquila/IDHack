@@ -1,14 +1,255 @@
- <!DOCTYPE html>
 <html>
   <head>
-    <title>Search Volunteer Openings</title>
+  	<style>
+  	section {
+  	    float:left;
+  	    padding:10px;	 	 
+  	}
+  	footer {
+  		clear:both;
+  	    text-align:left;
+  	    padding:10px;	 	 
+  	}
+  	</style>
+  <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+  <script>
+    google.load('visualization', '1', { 'packages': ['map', 'table'] });
+    google.setOnLoadCallback(drawMap);
+    google.setOnLoadCallback(drawTable);
 
-    <link rel='stylesheet' href='style.css' />
-    <script src="index.js"></script>
+    function drawMap() {
+      var data = google.visualization.arrayToDataTable([
+        ['Country', 'Opportunities'],
+        ['China', 'China: \nagriculture: 0 \ncommunity economic development: 1 \neducation: 2 \nenvironment: 0 \nhealth: 4 \nyouth in development: 9'],
+        ['India', 'India: \nagriculture: 0 \ncommunity economic development: 1 \neducation: 2 \nenvironment: 0 \nhealth: 4 \nyouth in development: 9'],
+      ]);
 
+    var options = { showTip: true };
+
+    var map = new google.visualization.Map(document.getElementById('chart_div'));
+
+    map.draw(data, options);
+
+    google.visualization.events.addListener(map, 'select', selectHandler);
+
+    function selectHandler() {
+	  var selection = map.getSelection();
+	  var message = '';
+	  for (var i = 0; i < selection.length; i++) {
+	    var item = selection[i];
+	    if (item.row != null && item.column != null) {
+	      var str = data.getFormattedValue(item.row, item.column);
+	      message += '{row:' + item.row + ',column:' + item.column + '} = ' + str + '\n';
+	    } else if (item.row != null) {
+	      var str = data.getFormattedValue(item.row, 0);
+	      message += '{row:' + item.row + ', column:none}; value (col 0) = ' + str + '\n';
+	    } else if (item.column != null) {
+	      var str = data.getFormattedValue(0, item.column);
+	      message += '{row:none, column:' + item.column + '}; value (row 0) = ' + str + '\n';
+	    }
+	  }
+	  if (message == '') {
+	    message = 'nothing';
+	  }
+	  alert('You selected ' + message);
+    };
+  };
+
+  function drawTable() {
+    var data = new google.visualization.DataTable();
+	data.addColumn('string', 'Sector'); 
+	data.addColumn('string', 'Position');
+    data.addColumn('string', 'Country');
+    data.addColumn('string', 'Region');
+    data.addColumn('string', 'Departs By');
+    data.addRows([
+      ['Education', 'Secondary Education English Teacher',  "Indonesia", "Asia", "March 2016"],
+      ['Education', 'Primary Education English Teacher',  "China", "Asia", "March 2015"]
+    ]);
+
+    var table = new google.visualization.Table(document.getElementById('results_table'));
+
+    table.draw(data, {showRowNumber: true});
+
+    // TODO: Change regions
+    regions = ["africa","asia","centralamerica","easteurope","northafr","pacificislands","southamerica","caribbean"];
+    $('#searchForm').submit(function(ev) {
+    	ev.preventDefault();
+    	var query = "http://www.peacecorps.gov/api/v1/openings/";
+
+    	// Handle regions
+    	var selectedCountries = $("#countries").val();
+    	if (selectedCountries) {
+	    	firstRegion = true;
+	    	for(var i=0; i<selectedCountries.length; i++) {
+	    		if (regions.indexOf(selectedCountries[i]) > -1) {
+	    			if (firstRegion) {
+	    				query += "?region=" + selectedCountries[i];
+	    				firstRegion=false;
+	    			} else {
+	    				query += "&region=" + selectedCountries[i];
+	    			}
+	    		}
+	    	}
+    	}
+
+    	// Handle countries
+    	if (selectedCountries) {
+	    	firstCountry = true;
+	    	for(var i=0; i<selectedCountries.length; i++) {
+	    		if (regions.indexOf(selectedCountries[i]) == -1) {
+	    			if (firstCountry) {
+	    				query += "?country=" + selectedCountries[i];
+	    				firstCountry=false;
+	    			} else {
+	    				query += "&country=" + selectedCountries[i];
+	    			}
+	    		}
+	    	}
+    	}
+
+    	// Handle sectors
+    	var selectedSectors = $("#sectors").val();
+    	if (selectedSectors) {
+	    	firstSector = true;
+	    	for(var i=0; i<selectedSectors.length; i++) {
+				if (firstSector) {
+					query += "?sector=" + selectedSectors[i];
+					firstSector=false;
+				} else {
+					query += "&country=" + selectedSectors[i];
+				}
+	    	}
+	    }
+
+    	// Handle languages
+    	var selectedLanguages = $("#languages").val();
+    	if (selectedLanguages) {
+	    	firstLanguage = true;
+	    	for(var i=0; i<selectedLanguages.length; i++) {
+				if (firstLanguage) {
+					query += "?language=" + selectedLanguages[i];
+					firstLanguage=false;
+				} else {
+					query += "&language=" + selectedLanguages[i];
+				}
+	    	}
+	    }
+
+	    // Handle couples
+	    if($("#couples").is(':checked')) {
+	    	query += "?couples=true";
+	    }
+
+	    var keyword = $("#keyword").val();
+	    if(keyword) {
+	    	query += "?keyword=" + keyword;
+	    }
+
+    	console.log(query);
+	});
+  }
+  </script>
   </head>
-  
   <body>
-	Hello World!
+  	<form id="searchForm">
+  	<section>
+  	Where do you want to go? <br>
+  	<select id="countries" multiple>
+  	<option value="caribbean">The Caribbean</option>
+  	<option value="dominicanrepublic">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dominican Republic</option>
+  	<option value="easterncarribean">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Eastern Carribean</option>
+  	<option value="jamaica">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Jamaica</option>
+  	</select>
+  	</section>
+  	<section>
+  	What do you want to do? <br>
+  	<select id="sectors" multiple>
+  	<option value="agriculture">Agriculture</option>
+  	<option value="communityeconomicdevelopment">Community Economic Development</option>
+  	<option value="education">Education</option>
+  	<option value="environment">Environment</option>
+  	<option value="health">Health</option>
+  	<option value="youthindevelopment">Youth in Development</option>
+  	</select>
+  	</section>
+  	<section>
+  	Language Requirement <br>
+  	<select id="language" multiple>
+  	<option value="norequirement">No Requirement</option>
+  	<option value="french">French</option>
+  	<option value="spanish">Spanish</option>
+  	<option value="anyromancelanguage">Any Romance Language</option>
+  	<option value="russian">Russian</option>
+  	<option value="other">Other</option>
+  	</select>
+  	</section>
+  	<section>
+  	Skills Requirement (select all that you meet) <br>
+  	<select id="skills" multiple>
+  	<option value="norequirement">No Requirement</option>
+  	<option value="bachelors">BA/BS</option>
+  	<option value="registerednurse">Registered nurse</option>
+  	<option value="fulltimeexperience">Full time experience in relevant job sector</option>
+  	</select>
+  	</section>
+  	<footer>
+  	Departure between 
+  	<select>
+  	<option value="january">January</option>
+  	<option value="february">February</option>
+  	<option value="march">March</option>
+  	<option value="april">April</option>
+  	<option value="may">May</option>
+  	<option value="june">June</option>
+  	<option value="july">July</option>
+  	<option value="august">August</option>
+  	<option value="september">September</option>
+  	<option value="january">October</option>
+  	<option value="january">November</option>
+  	<option value="january">December</option>
+  	</select>
+  	<select>
+  	<option value="2015">2015</option>
+  	<option value="2016">2016</option>
+  	</select>
+  	and 
+  	<select id="month">
+  	<option value="january">January</option>
+  	<option value="february">February</option>
+  	<option value="march">March</option>
+  	<option value="april">April</option>
+  	<option value="may">May</option>
+  	<option value="june">June</option>
+  	<option value="july">July</option>
+  	<option value="august">August</option>
+  	<option value="september">September</option>
+  	<option value="january">October</option>
+  	<option value="january">November</option>
+  	<option value="january">December</option>
+  	</select>
+  	<select id="year">
+  	<option value="2015">2015</option>
+  	<option value="2016">2016</option>
+  	</select>
+  	</footer>
+  	<section>
+  	<input type="checkbox" id="couples" name="accepts_couples" value="true">Accepts Couples
+  	</section>
+  	<section>
+  	Keyword Search
+  	<input type="text" id="keyword" name="keyword">
+  	</section>
+  	<footer>
+  	<input type="submit" value="Update results">
+  	</footer>
+  	</form>
+    <div id="chart_div"></div>
+
+    <div id="results_div">
+    	<label>1</label> opening. Click on a column header to sort.
+    	<div id="results_table"></div>
+   	</div>
   </body>
 </html>
