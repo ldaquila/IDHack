@@ -1,15 +1,19 @@
 <html>
   <head>
   	<style>
-  	section {
-  	    float:left;
-  	    padding:10px;	 	 
-  	}
-  	footer {
-  		clear:both;
-  	    text-align:left;
-  	    padding:10px;	 	 
-  	}
+	  header {
+	     text-align:center;
+	     padding:5px;  
+	  }
+	  section {
+	     float:left;
+	     padding:10px;  
+	  }
+	  footer {
+	     clear:both;
+	     text-align:center;
+	     padding:5px;  
+	  }
   	</style>
   <script type="text/javascript" src="https://www.google.com/jsapi"></script>
   <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
@@ -45,8 +49,16 @@
 		data.addColumn('string', 'Region');
 		data.addColumn('string', 'Start Date');
 		rowsList = [];
+
+		var first_date_filter = new Date($('#start_year').val(), $('#start_month').val());
+		var second_date_filter = new Date($('#end_year').val(), $('#end_month').val());
 		for (var i=0; i<results.length; i++) {
-			rowsList.push([results[i]['sector'], "<a href='" + results[i]['opening_url'] + "'>" + results[i]['title'] + "</a>", countries_map[results[i]['country']], regions_map[results[i]['region']], results[i]['staging_start_date']]);
+			var date_components = results[i]['staging_start_date'].split("-");
+			var d = new Date(date_components[0], date_components[1]);
+
+			if (d >= first_date_filter && d <= second_date_filter) {
+				rowsList.push([results[i]['sector'], "<a href='" + results[i]['opening_url'] + "'>" + results[i]['title'] + "</a>", countries_map[results[i]['country']], regions_map[results[i]['region']], results[i]['staging_start_date']]);
+			}
 		}
 		data.setColumnProperty(0, {allowHtml: true});
 		data.addRows(rowsList);
@@ -56,13 +68,6 @@
 		table.draw(data, {allowHtml: true});
 	};
 
-	function capitalizeFirstLetter(string)
-	{
-	    return string.charAt(0).toUpperCase() + string.slice(1);
-	}
-
-    // TODO: Change regions
-    regions = ["africa","asia","centralamerica","easteurope","northafr","pacificislands","southamerica","caribbean"];
     $(document).on('submit', '#searchForm', function(ev) {
     	ev.preventDefault();
     	var query = "http://www.peacecorps.gov/api/v1/openings/";
@@ -72,7 +77,7 @@
     	if (selectedCountries) {
 	    	firstRegion = true;
 	    	for(var i=0; i<selectedCountries.length; i++) {
-	    		if (regions.indexOf(selectedCountries[i]) > -1) {
+	    		if (selectedCountries[i] in regions_map) {
 	    			if (firstRegion) {
 	    				query += "?region=" + selectedCountries[i];
 	    				firstRegion=false;
@@ -87,7 +92,7 @@
     	if (selectedCountries) {
 	    	firstCountry = true;
 	    	for(var i=0; i<selectedCountries.length; i++) {
-	    		if (regions.indexOf(selectedCountries[i]) == -1) {
+	    		if (selectedCountries[i] in countries_map) {
 	    			if (firstCountry) {
 	    				query += "?country=" + selectedCountries[i];
 	    				firstCountry=false;
@@ -159,12 +164,12 @@
 	    getOpenings(getOpeningsInner, query);
 	 });
 
-	function getOpenings(callback, url){
+	function getOpenings(callback_table, url){
 		$.ajax({
 		    url: url,
 		    type: 'GET',
 		    success: function(data) { 
-		      callback(data);
+		      callback_table(data);
 		    }
 		});
 	};
@@ -243,12 +248,14 @@
   <body>
   	<form id="searchForm">
   	<section>
-  	Where do you want to go? <br>
+  	<b>Where do you want to go? </b><br>
+  	<a href="http://www.peacecorps.gov/volunteer/learn/wherepc/"target="_blank">Learn more about locations</a> <br>
   	<select id="countries" multiple>
   	</select>
   	</section>
   	<section>
-  	What do you want to do? <br>
+  	 <b>What do you want to do? </b><br>
+  	<a href="http://www.peacecorps.gov/volunteer/learn/whatvol/"target="_blank">Learn more about sectors</a> <br>
   	<select id="sectors" multiple>
   	<option value="agriculture">Agriculture</option>
   	<option value="communityeconomicdevelopment">Community Economic Development</option>
@@ -259,7 +266,7 @@
   	</select>
   	</section>
   	<section>
-  	Language Requirement <br>
+  	<b>Language Requirement </b><br>
   	<select id="language" multiple>
   	<option value="norequirement">No Requirement</option>
   	<option value="french">French</option>
@@ -270,7 +277,8 @@
   	</select>
   	</section>
   	<section>
-  	Skills Requirement (select all that you meet) <br>
+  	<b>Skills Requirement</b> (select all that you meet) <br>
+  	<a href="http://www.peacecorps.gov/volunteer/learn/howvol/lookingfor/"target="_blank">Learn more about background fit</a> <br>
   	<select id="skills" multiple>
   	<option value="norequirement">No Requirement</option>
   	<option value="bachelors">BA/BS</option>
@@ -280,52 +288,49 @@
   	</section>
   	<footer>
   	Departure between 
-  	<select>
-  	<option value="january">January</option>
-  	<option value="february">February</option>
-  	<option value="march">March</option>
-  	<option value="april">April</option>
-  	<option value="may">May</option>
-  	<option value="june">June</option>
-  	<option value="july">July</option>
-  	<option value="august">August</option>
-  	<option value="september">September</option>
-  	<option value="january">October</option>
-  	<option value="january">November</option>
-  	<option value="january">December</option>
+  	<select id="start_month">
+  	<option value="1">January</option>
+  	<option value="2">February</option>
+  	<option value="3">March</option>
+  	<option value="4">April</option>
+  	<option value="5">May</option>
+  	<option value="6">June</option>
+  	<option value="7">July</option>
+  	<option value="8">August</option>
+  	<option value="9">September</option>
+  	<option value="10">October</option>
+  	<option value="11">November</option>
+  	<option value="12">December</option>
   	</select>
-  	<select>
+  	<select id="start_year">
   	<option value="2015">2015</option>
   	<option value="2016">2016</option>
   	</select>
   	and 
-  	<select id="month">
-  	<option value="january">January</option>
-  	<option value="february">February</option>
-  	<option value="march">March</option>
-  	<option value="april">April</option>
-  	<option value="may">May</option>
-  	<option value="june">June</option>
-  	<option value="july">July</option>
-  	<option value="august">August</option>
-  	<option value="september">September</option>
-  	<option value="january">October</option>
-  	<option value="january">November</option>
-  	<option value="january">December</option>
+  	<select id="end_month">
+  	<option value="1">January</option>
+  	<option value="2">February</option>
+  	<option value="3">March</option>
+  	<option value="4">April</option>
+  	<option value="5">May</option>
+  	<option value="6">June</option>
+  	<option value="7">July</option>
+  	<option value="8">August</option>
+  	<option value="9">September</option>
+  	<option value="10">October</option>
+  	<option value="11">November</option>
+  	<option value="12">December</option>
   	</select>
-  	<select id="year">
+  	<select id="end_year">
   	<option value="2015">2015</option>
   	<option value="2016">2016</option>
   	</select>
-  	</footer>
-  	<section>
-  	<input type="checkbox" id="couples" name="accepts_couples" value="true">Accepts Couples
-  	</section>
-  	<section>
+  	<br><br>
+	<input type="checkbox" id="couples" name="accepts_couples" value="true">Accepts Couples&nbsp;&nbsp;&nbsp;&nbsp;
+	  <a href="http://www.peacecorps.gov/volunteer/learn/howvol/faq/couples/"target="_blank">FAQ about couples</a> <br>
+	  <br>
   	Keyword Search
   	<input type="text" id="keyword" name="keyword">
-  	</section>
-  	<footer>
   	<input type="submit" value="Update results">
   	</footer>
   	</form>
@@ -336,5 +341,18 @@
     	<div id="results_table"></div>
     	<button id="previous" style="visibility:hidden">Previous Page</button><button id="next" style="visibility:hidden">Next Page</button>
    	</div>
+   	<footer>
+   	<i>Check out <a href="http://www.peacecorps.gov/volunteer/learn/whatlike/ownwords/"target="_blank">blog</a>
+   	and <a href="http://www.peacecorps.gov/volunteer/learn/whatlike/ownwords/"target="_blank">video</a>
+   	testimonials from past volunteers to help with your search. </i> <br><br>
+   	<b>Other Peace Corps Opportunities</b> <br>
+   	Are you interested in graduate studies during or after your Peace Corps service? Learn about our 
+   	<a href="http://www.peacecorps.gov/volunteer/graduate/"target="_blank">graduate programs.</a> <br>
+   	Are you a professional or returning volunteer looking for a short-term assignment? Learn about 
+   	<a href="http://www.peacecorps.gov/volunteer/response/"target="_blank">Peace Corps Response.</a> <br>
+   	Are you a physician or nurse? You may be interested in the 
+   	<a href="http://www.peacecorps.gov/volunteer/globalhealth/"target="_blank">Global Health Service Partnership.</a> <br><br>
+   	<a href="http://www.peacecorps.gov/volunteer/learn/">Return to the Peace Corps Volunteers page.</a>
+   	</footer>
   </body>
 </html>
