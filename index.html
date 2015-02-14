@@ -20,26 +20,10 @@
   <script>
   	var previous=""; var next="";
     google.load('visualization', '1', { 'packages': ['map', 'table'] });
-    google.setOnLoadCallback(drawMap);
     google.setOnLoadCallback(drawTable);
 
     regions_map = new Object();
     countries_map = new Object();
-
-    function drawMap() {
-		var data = google.visualization.arrayToDataTable([
-		['Country', 'Opportunities'],
-		['China', 'China: \nagriculture: 0 \ncommunity economic development: 1 \neducation: 2 \nenvironment: 0 \nhealth: 4 \nyouth in development: 9'],
-		['India', 'India: \nagriculture: 0 \ncommunity economic development: 1 \neducation: 2 \nenvironment: 0 \nhealth: 4 \nyouth in development: 9'],
-		]);
-
-		var options = { showTip: true };
-
-		var map = new google.visualization.Map(document.getElementById('chart_div'));
-
-		map.draw(data, options);
-
-	}
 
 	function drawTable(results) {
 		var data = new google.visualization.DataTable();
@@ -50,15 +34,15 @@
 		data.addColumn('string', 'Start Date');
 		rowsList = [];
 
-		var first_date_filter = new Date($('#start_year').val(), $('#start_month').val());
-		var second_date_filter = new Date($('#end_year').val(), $('#end_month').val());
+		//var first_date_filter = new Date($('#start_year').val(), $('#start_month').val());
+		//var second_date_filter = new Date($('#end_year').val(), $('#end_month').val());
 		for (var i=0; i<results.length; i++) {
-			var date_components = results[i]['staging_start_date'].split("-");
-			var d = new Date(date_components[0], date_components[1]);
+		//	var date_components = results[i]['staging_start_date'].split("-");
+		//	var d = new Date(date_components[0], date_components[1]);
 
-			if (d >= first_date_filter && d <= second_date_filter) {
+			//if (d >= first_date_filter && d <= second_date_filter) {
 				rowsList.push([results[i]['sector'], "<a href='" + results[i]['opening_url'] + "'>" + results[i]['title'] + "</a>", countries_map[results[i]['country']], regions_map[results[i]['region']], results[i]['staging_start_date']]);
-			}
+			//}
 		}
 		data.setColumnProperty(0, {allowHtml: true});
 		data.addRows(rowsList);
@@ -162,6 +146,8 @@
 	    };
 
 	    getOpenings(getOpeningsInner, query);
+	    console.log(1);
+	    console.log(2);
 	 });
 
 	function getOpenings(callback_table, url){
@@ -169,10 +155,33 @@
 		    url: url,
 		    type: 'GET',
 		    success: function(data) { 
+		    	console.log(3);
 		      callback_table(data);
+		      console.log(4);
 		    }
 		});
 	};
+
+	// function getAllOpenings(url, callback){
+	// 	$.ajax({
+	// 	    url: url,
+	// 	    type: 'GET',
+	// 	    success: function(data) { 
+	// 	      callback(data['results']);
+	// 	    }
+	// 	});
+	// };
+
+  function getAllOpenings(callback){
+    $.ajax({
+      url: 'http://www.peacecorps.gov/api/v1/openings/?page_size=100',
+      type: 'GET',
+      success: function(data){
+        callback(data['results']);
+      }
+    })
+  }
+
 
 	/*  callback: callback function
 	    passes a list of regions to callback
@@ -242,6 +251,128 @@
 	$(document).on('click', '#next', function(ev) {
 		getOpenings(getOpeningsInner, next);
 	});
+
+  function showMap(){
+    google.load("visualization", "1", {packages:["geomap"]});
+    google.setOnLoadCallback(drawMap);
+    function drawMap() {
+      getCountriesByRegion(function(countries_by_region){
+        // generate list of countries (slugs)
+        var countries = [];
+        // console.log(countries_by_region);
+        var info_map = new Object(); // maps slugs to country info object
+        var name_to_slug = new Object(); // maps country name to slug
+        for (var region in countries_by_region){
+          var countries_in_region = countries_by_region[region];
+          for (var i = 0; i < countries_in_region.length; i++){
+            countries.push(countries_in_region[i]['slug']);
+            info_map[countries_in_region[i]['slug']] = countries_in_region[i];
+            name_to_slug[countries_in_region[i]['name']] = countries_in_region[i]['slug'];
+          }
+        }
+        // console.log(countries)
+        // console.log(name_to_slug);
+        // creat hashmap to map slug to number of openings
+        var openings_by_country = new Object();
+        var sector_map = new Object(); // sector_map[slug][sector] = boolean
+        // inialize hashmap with each country
+        for (var i = 0; i < countries.length; i++){
+          openings_by_country[countries[i]] = 0;
+          sector_map[countries[i]] = new Object();
+          sector_map[countries[i]]['Community Economic Development'] = false;
+          sector_map[countries[i]]['Health'] = false;
+          sector_map[countries[i]]['Environment'] = false;
+          sector_map[countries[i]]['Education'] = false;
+          sector_map[countries[i]]['Youth in Development'] = false;
+          sector_map[countries[i]]['Agriculture'] = false;
+        }
+        // console.log(openings_by_country);
+        // url = url + '?page_size=100';
+        getAllOpenings(function(openings){
+          // update hashmap
+          for (var j = 0; j < openings.length; j++){
+            openings_by_country[openings[j]['country']] ++;
+            sector_map[openings[j]['country']][openings[j]['sector']] = true;
+          }
+          // create data for geomap
+          var dataArray = [['Country', 'Openings']];
+          for (var i = 0; i < countries.length; i++){
+            numOpenings = openings_by_country[countries[i]];
+
+            if (numOpenings > 0) {
+              // display name of country and num of openings
+              dataArray.push([info_map[countries[i]]['name'], numOpenings]);
+            }
+          }
+          data = google.visualization.arrayToDataTable(dataArray);
+          // for (var k = 0; k < dataArray.length - 1; k ++){
+          //   console.log(dataArray[k + 1][0]);
+          //   data.setValue(0, k, dataArray[k + 1][0]);
+          // }
+          
+
+          var options = {};
+          options['dataMode'] = 'regions';
+          options['showZoomOut'] = false;
+          options['width'] = 834;
+          options['height'] = 521;
+          options['region'] = 'world';
+
+          var container = document.getElementById('regions_div');
+          var geomap = new google.visualization.GeoMap(container);
+          geomap.draw(data, options);
+          google.visualization.events.addListener(geomap, 'regionClick', function(e) {
+            var region = e['region'];
+            console.log(region);
+            // options['region'] = region;
+            // geomap.draw(data, options);
+
+
+
+          });
+
+          // zoomOut event listener -> sets back to world view
+          google.visualization.events.addListener(geomap, 'zoomOut', function(e) {
+            options['region'] = 'world';
+            geomap.draw(data, options);
+          });
+
+          // select event listene
+          google.visualization.events.addListener(geomap, 'select', function(e) {
+            var row = geomap.getSelection()[0]['row'];
+            var name = dataArray[row+1][0];
+            var slug = name_to_slug[name];
+            var url = info_map[slug]['country_page_url'];
+            console.log('here');  
+            var num_openings = openings_by_country[slug];
+            console.log(num_openings);  
+            // console.log(slug);
+            console.log(url);
+            console.log(info_map[slug]);
+            $("#country_name").html(name);
+            $("#country_url").attr("href", url);
+            $('#country_openings').html('Openings: ' + num_openings);
+            $('#areas_label').css('visibility', 'visible');
+            // clear previous areas list
+            $("#areas_list").empty();
+            // update areas list
+            for (sector in sector_map[slug]){
+              if (sector_map[slug][sector]){
+                $("#areas_list").append('<li>'+sector+'</li>');
+              }
+            }
+
+
+          });
+        });
+      });
+        
+      
+    };
+
+  }
+  showMap();
+
 
   </script>
   </head>
@@ -334,7 +465,15 @@
   	<input type="submit" value="Update results">
   	</footer>
   	</form>
-    <div id="chart_div"></div>
+    <div>
+          <div style= "float: left" id="regions_div" style="width: 900px; height: 500px;"></div>
+          <div style= "float: left" id="country_info">
+            <a id = "country_url" href=""><h1 id="country_name"></h1></a>
+            <h2 id= "country_openings"></h2>
+            <h2 style="visibility: hidden" id="areas_label">Available Areas:</h2>
+            <ul id= "areas_list"></ul>
+          </div>
+        </div>
 
     <div id="results_div">
     	<label id="count"></label> opening(s). Click on a column header to sort.
